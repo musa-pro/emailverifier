@@ -55,11 +55,12 @@
 		var $fsock = false;
 		var $port = 25;	//defualt port
 		var $con_timeout = 10;
-		var $data_timeout = 2;
+		var $data_timeout = 5;
 		var $local_user = 'localuser';
 		var $local_host = 'localhost';
 		var $email_regex = "/^([a-z0-9_\.-]+)@([\da-z\.-]+)\.([a-z\.]{2,6})$/";
-		var $debug_data = array();
+		var $debug_on = false;
+		var $debug_txt = array();
 		
 		/**
 		*	validate the email pattern
@@ -68,7 +69,13 @@
 		public function validatedEmail($email=null){
 			if(!empty($email)) $email = $this->email;
 			
-			return preg_match($this->email_regex, $this->email);
+			if(preg_match($this->email_regex, $this->email)){
+				$this->debug_txt[] = 'Valid email address';
+				return true;
+			}else{
+				$this->debug_txt[] = 'Invalid email address';
+				return false;	
+			} 
 		}
 		
 		/**
@@ -79,9 +86,13 @@
 		protected function verifyDNS(){
 		
 			list($this->user, $this->domain) = explode("@", $this->email);
-			if(checkdnsrr($this->domain, "MX")) return true;
-			
-			return false;
+			if(checkdnsrr($this->domain, "MX")){
+				$this->debug_txt[] = 'DNS record is valid';				
+				return true;	
+			}else{ 
+				$this->debug_txt[] = 'Invalid DNS records';				
+				return false;
+			}	
 		}
 		
 		/**
@@ -94,15 +105,17 @@
 			
 			if($result){
 				$unique_weights = array_unique($weights);
-
 				if(sizeof($unique_weights)==1 && sizeof($hosts)>1 ){
 
 					$weights = range(1, sizeof($hosts));
 				}
 
 				$this->mxRecords = array_combine($weights, $hosts);
-				//array_push($this->mxRecords, $this->domain);
 				ksort($this->mxRecords);
+				$this->debug_txt[] = 'Found following MX Records';
+				$this->debug_txt[] = PHP_EOL;
+				$this->debug_txt[] = implode("\n", $this->mxRecords );
+				$this->debug_txt[] = PHP_EOL;				
 			}
 				
 			return $result;
@@ -122,7 +135,14 @@
 				}
 			}
 			
-			return $this->fsock;
+			if($this->fsock){
+				$this->debug_txt[] = 'Socket connection created';
+				return $this->fsock;
+			}else{
+				$this->debug_txt[] = 'Socket connection failed no# '.$errno.' error# '.$error;
+				return false;
+			}
+			
 		}
 		
 		/*
@@ -131,18 +151,26 @@
 		protected function send($msg){
 
 			if(empty($msg))	return false;
+			
+			$this->debug_txt[] = $msg;	
 
-			if(!fputs($this->fsock, $msg."\n"))	
+			if(!fputs($this->fsock, $msg."\n")){
+				$this->debug_txt[] = 'Failed to send data ';	
 				return false;
+			}	
 				
 			$response = null;
 
-			while( !feof($this->fsock) ) {
-				$buffer = fread($this->fsock, 1024);
-				$response .= $buffer;
+			while(1) {
+					$buffer = fread($this->fsock, 1028);
+					$response .= $buffer;
+					if(empty($buffer))
+						break;
 			}
 			
-			//print_r($response);
+			if($response){
+				$this->debug_txt[] = 'Received response '.$response;
+			}
 			
 			return $response;
 		}
@@ -156,13 +184,14 @@
 		protected function ping(){
 
 			if($this->fsock){
+
 				stream_set_timeout($this->fsock, $this->data_timeout);
 				
 				if(!$this->send("HELO ".$this->local_host)) return;
 				if(!$this->send("MAIL FROM: <".$this->local_user.'@'.$this->local_host.">")) return;
 				
 				$response = $this->send("RCPT TO: <".$this->user.'@'.$this->domain.">");
-				
+
 				// Get response code
 				list($code, $msg) = explode(' ', $response);
 
@@ -216,5 +245,22 @@
 			return $finalresponse;
 			
 		}
+		
+		/*
+		*	Show debug message
+		*/
+		public function debug(){
+			if($this->debug_on==true){
+				print "<pre>";
+				print implode("\r\n", $this->debug_txt);
+				print "</pre>";
+			}			
+		}
+		
+		//Class destructor
+		function __destruct(){
+			$this->debug();
+		}
+		
 	}
 ?>
