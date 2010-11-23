@@ -7,6 +7,7 @@
 	*
 	* @package email address verification class
 	* @author Musa
+	* @version 1.1
 	* @website http://kodegeek.wordpress.com
 	**/
   	
@@ -70,10 +71,10 @@
 			if(!empty($email)) $email = $this->email;
 			
 			if(preg_match($this->email_regex, $this->email)){
-				$this->debug_txt[] = 'Valid email address';
+				$this->debug_txt[] = 'Email address pattern OK';
 				return true;
 			}else{
-				$this->debug_txt[] = 'Invalid email address';
+				$this->debug_txt[] = 'Invalid email address pattern.';
 				return false;	
 			} 
 		}
@@ -136,10 +137,10 @@
 			}
 			
 			if($this->fsock){
-				$this->debug_txt[] = 'Socket connection created';
+				$this->debug_txt[] = 'Socket created';
 				return $this->fsock;
 			}else{
-				$this->debug_txt[] = 'Socket connection failed no# '.$errno.' error# '.$error;
+				$this->debug_txt[] = 'Socket creation failed. Error no# '.$errno.', Error: '.$error;
 				return false;
 			}
 			
@@ -168,8 +169,10 @@
 						break;
 			}
 			
-			if($response){
-				$this->debug_txt[] = 'Received response '.$response;
+			//var_dump($response);
+			
+			if(!empty($response)){
+				$this->debug_txt[] = 'Received response &raquo; '.$response;
 			}
 			
 			return $response;
@@ -191,9 +194,9 @@
 				if(!$this->send("MAIL FROM: <".$this->local_user.'@'.$this->local_host.">")) return;
 				
 				$response = $this->send("RCPT TO: <".$this->user.'@'.$this->domain.">");
-
+				
 				// Get response code
-				list($code, $msg) = explode(' ', $response);
+				list($code, $msg) = @explode(' ', $response);
 
 				$this->user = null;
 				$this->domain = null;
@@ -251,7 +254,7 @@
 		*/
 		public function debug(){
 			if($this->debug_on==true){
-				print "<pre>";
+				print "<pre style=\"background:gray; padding: 3px;\">Debugging Stats<br />";
 				print implode("\r\n", $this->debug_txt);
 				print "</pre>";
 			}			
